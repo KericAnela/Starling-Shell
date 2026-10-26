@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <signal.h>
 
+// Displays a prompt with the current user and hostname
 void display_prompt() {
     char hostname[256] = "starling";
     char username[256] = "user";
@@ -21,6 +22,7 @@ void display_prompt() {
         strcpy(username, user);
     }
 
+    // ANSI escape codes for custom colorized prompt output
     printf("\033[38;5;218m%s\033[0m", username); 
     printf("@"); 
     printf("\033[38;5;229m%s\033[0m", hostname); 
@@ -29,10 +31,12 @@ void display_prompt() {
     fflush(stdout);
 }
 
+// Forks a child process to execute external binaries safely
 void execute_external (char **args) {
     pid_t pid = fork();
 
     if (pid == 0) {
+        // Restore default signal handling in the child process
         signal(SIGINT, SIG_DFL);
 
         if (execvp(args[0], args) == -1) {
@@ -43,11 +47,13 @@ void execute_external (char **args) {
     } else if (pid < 0) {
         perror("Starling Error: Fork failed");
     } else {
+        // Parent waits for the child process to complete execution
         int status;
         waitpid(pid, &status, 0);
     }
 }
 
+// Built-in 'cd' command must run in the parent process to alter the shell's working directory
 void starling_cd(char **args) {
     if (args[1] == NULL) {
     
@@ -140,6 +146,7 @@ void starling_cat(char **args) {
     }
 }
 
+// Handles file redirection (>) using file descriptor duplication via dup2
 void handle_redirection(char **args) {
     for (int i = 0; args[i] != NULL; i++) {
         if (strcmp(args[i], ">") == 0) {
@@ -155,12 +162,14 @@ void handle_redirection(char **args) {
                 return;
             }
 
+            // Redirect stdout to the target file descriptor
             if (dup2(fd, STDOUT_FILENO) < 0) {
                 perror("Starling dup2");
                 return;
             }
             close(fd);
 
+            // Strip redirection operators and filename from command args array
             args[i] = NULL;
             args[i + 1] = NULL;
             break;
@@ -172,11 +181,13 @@ int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     char input[1024];
 
+    // Ignore SIGINT in the parent shell so Ctrl+C doesn't terminate the shell itself
     signal(SIGINT, SIG_IGN);
 
     while (1) {
         display_prompt();
 
+        // Save original stdout stream so it can be restored after redirection
         int saved_stdout = dup(STDOUT_FILENO);
 
         if (fgets(input, sizeof(input), stdin) == NULL) {
@@ -213,6 +224,7 @@ int main() {
             execute_external(args);
         }
 
+        // Restore original stdout stream layout for the next loop iteration
         dup2(saved_stdout, STDOUT_FILENO);
         close(saved_stdout);
     }
